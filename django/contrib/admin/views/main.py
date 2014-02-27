@@ -106,7 +106,7 @@ class ChangeList(six.with_metaclass(RenameChangeListMethods)):
         if self.is_popup:
             title = ugettext('Select %s')
         else:
-            title = ugettext('Select %s to change')
+            title = ugettext('Select %s to view or change')
         self.title = title % force_text(self.opts.verbose_name)
         self.pk_attname = self.lookup_opts.pk.attname
 

@@ -385,6 +385,11 @@ class AdminSite(object):
                             model_dict['admin_url'] = reverse('admin:%s_%s_changelist' % info, current_app=self.name)
                         except NoReverseMatch:
                             pass
+                    elif perms.get('view', False):
+                        try:
+                            model_dict['view_url'] = reverse('admin:%s_%s_changelist' % info, current_app=self.name)
+                        except NoReverseMatch:
+                            pass
                     if perms.get('add', False):
                         try:
                             model_dict['add_url'] = reverse('admin:%s_%s_add' % info, current_app=self.name)
@@ -442,6 +447,11 @@ class AdminSite(object):
                     if perms.get('change'):
                         try:
                             model_dict['admin_url'] = reverse('admin:%s_%s_changelist' % info, current_app=self.name)
+                        except NoReverseMatch:
+                            pass
+                    elif perms.get('view'):
+                        try:
+                            model_dict['view_url'] = reverse('admin:%s_%s_changelist' % info, current_app=self.name)
                         except NoReverseMatch:
                             pass
                     if perms.get('add'):

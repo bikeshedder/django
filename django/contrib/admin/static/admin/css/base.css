@@ -633,6 +633,11 @@ div.breadcrumbs {
     background: url(../img/icon_addlink.gif) 0 .2em no-repeat;
 }
 
+.viewlink {
+    padding-left: 12px;
+    background: url(../img/icon_viewlink.gif) 0 .2em no-repeat;
+}
+
 .changelink {
     padding-left: 12px;
     background: url(../img/icon_changelink.gif) 0 .2em no-repeat;

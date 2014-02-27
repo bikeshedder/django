@@ -446,6 +446,21 @@ class BaseModelAdmin(six.with_metaclass(RenameBaseModelAdminMethods)):
         codename = get_permission_codename('add', opts)
         return request.user.has_perm("%s.%s" % (opts.app_label, codename))
 
+    def has_view_permission(self, request, obj=None):
+        """
+        Returns True if the given request has permissions to view the given
+        Django model instance, the default implementation doesn't examine the
+        `obj` parameter.
+
+        Can be overridden by the user in subclasses. In such case it should
+        return True if the given request has permission to view the `obj`
+        model instance. If `obj` is None, this should return True if the given
+        request has permission to view *any* object of the given type.
+        """
+        opts = self.opts
+        codename = get_permission_codename('view', opts)
+        return request.user.has_perm("%s.%s" % (opts.app_label, codename))
+
     def has_change_permission(self, request, obj=None):
         """
         Returns True if the given request has permission to change the given
@@ -532,6 +547,7 @@ class ModelAdmin(BaseModelAdmin):
             inline = inline_class(self.model, self.admin_site)
             if request:
                 if not (inline.has_add_permission(request) or
+                        inline.has_view_permission(request, obj) or
                         inline.has_change_permission(request, obj) or
                         inline.has_delete_permission(request, obj)):
                     continue
@@ -587,6 +603,7 @@ class ModelAdmin(BaseModelAdmin):
         """
         return {
             'add': self.has_add_permission(request),
+            'view': self.has_view_permission(request),
             'change': self.has_change_permission(request),
             'delete': self.has_delete_permission(request),
         }
@@ -1044,6 +1061,7 @@ class ModelAdmin(BaseModelAdmin):
             'add': add,
             'change': change,
             'has_add_permission': self.has_add_permission(request),
+            'has_view_permission': self.has_view_permission(request, obj),
             'has_change_permission': self.has_change_permission(request, obj),
             'has_delete_permission': self.has_delete_permission(request, obj),
             'has_file_field': True,  # FIXME - this should check if form or formsets have a FileField,
@@ -1163,7 +1181,8 @@ class ModelAdmin(BaseModelAdmin):
         when adding a new object.
         """
         opts = self.model._meta
-        if self.has_change_permission(request, None):
+        if self.has_view_permission(request, None) or \
+                self.has_change_permission(request, None):
             post_url = reverse('admin:%s_%s_changelist' %
                                (opts.app_label, opts.model_name),
                                current_app=self.admin_site.name)
@@ -1320,11 +1339,14 @@ class ModelAdmin(BaseModelAdmin):
             if not self.has_add_permission(request):
                 raise PermissionDenied
             obj = None
+            readonly = False
 
         else:
             obj = self.get_object(request, unquote(object_id))
+            readonly = not self.has_change_permission(request, obj)
 
-            if not self.has_change_permission(request, obj):
+            if not (self.has_view_permission(request, obj) or
+                    self.has_change_permission(request, obj)):
                 raise PermissionDenied
 
             if obj is None:
@@ -1338,6 +1360,8 @@ class ModelAdmin(BaseModelAdmin):
 
         ModelForm = self.get_form(request, obj)
         if request.method == 'POST':
+            if readonly:
+                raise PermissionDenied
             form = ModelForm(request.POST, request.FILES, instance=obj)
             if form.is_valid():
                 form_validated = True
@@ -1374,11 +1398,18 @@ class ModelAdmin(BaseModelAdmin):
                 form = ModelForm(instance=obj)
                 formsets, inline_instances = self._create_formsets(request, obj)
 
+        # Make all fields read-only if viewing the admin without add or change
+        # permissions.
+        if readonly:
+            readonly_fields = flatten_fieldsets(self.get_fieldsets(request, obj))
+        else:
+            readonly_fields = self.get_readonly_fields(request, obj)
+
         adminForm = helpers.AdminForm(
             form,
             list(self.get_fieldsets(request, obj)),
             self.get_prepopulated_fields(request, obj),
-            self.get_readonly_fields(request, obj),
+            readonly_fields,
             model_admin=self)
         media = self.media + adminForm.media
 
@@ -1386,8 +1417,15 @@ class ModelAdmin(BaseModelAdmin):
         for inline_formset in inline_formsets:
             media = media + inline_formset.media
 
+        if add:
+            title = _('Add %s') % force_text(opts.verbose_name)
+        elif readonly:
+            title = _('View %s') % force_text(opts.verbose_name)
+        else:
+            title = _('Change %s') % force_text(opts.verbose_name)
+
         context = dict(self.admin_site.each_context(),
-            title=(_('Add %s') if add else _('Change %s')) % force_text(opts.verbose_name),
+            title=title,
             adminform=adminForm,
             object_id=object_id,
             original=obj,
@@ -1419,7 +1457,8 @@ class ModelAdmin(BaseModelAdmin):
         from django.contrib.admin.views.main import ERROR_FLAG
         opts = self.model._meta
         app_label = opts.app_label
-        if not self.has_change_permission(request, None):
+        if not (self.has_view_permission(request, None) or
+                self.has_change_permission(request, None)):
             raise PermissionDenied
 
         list_display = self.get_list_display(request)
@@ -1632,7 +1671,8 @@ class ModelAdmin(BaseModelAdmin):
         model = self.model
         obj = get_object_or_404(self.get_queryset(request), pk=unquote(object_id))
 
-        if not self.has_change_permission(request, obj):
+        if not (self.has_view_permission(request, obj) or
+                self.has_change_permission(request, obj)):
             raise PermissionDenied
 
         # Then get the history for this object.

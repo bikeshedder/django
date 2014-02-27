@@ -23,6 +23,8 @@
             <tr class="model-{{ model.object_name|lower }}">
             {% if model.admin_url %}
                 <th scope="row"><a href="{{ model.admin_url }}">{{ model.name }}</a></th>
+            {% elif model.view_url %}
+                <th scope="row"><a href="{{ model.view_url }}">{{ model.name }}</a></th>
             {% else %}
                 <th scope="row">{{ model.name }}</th>
             {% endif %}
@@ -35,6 +37,8 @@
 
             {% if model.admin_url %}
                 <td><a href="{{ model.admin_url }}" class="changelink">{% trans 'Change' %}</a></td>
+            {% elif model.view_url %}
+                <td><a href="{{ model.view_url }}" class="viewlink">{% trans 'View' %}</a></td>
             {% else %}
                 <td>&nbsp;</td>
             {% endif %}
